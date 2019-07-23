@@ -63,13 +63,15 @@ ebnm_normal_mix_workhorse <- function(x,
   n_obs     <- length(x)
 
   # Adapted from ashr:::estimate_mixprop.
-  if (length(s) == 1) {
-    s <- rep(s, n_obs)
-  }
-  sigmamat   <- outer(s^2, scale^2, `+`)
-  llik_mat   <- -0.5 * (log(sigmamat) + (x - mode)^2 / sigmamat)
-  llik_norms <- apply(llik_mat, 1, max)
-  L_mat      <- exp(llik_mat - llik_norms)
+  t.llik <- system.time({
+    if (length(s) == 1) {
+      s <- rep(s, n_obs)
+    }
+    sigmamat   <- outer(s^2, scale^2, `+`)
+    llik_mat   <- -0.5 * (log(sigmamat) + (x - mode)^2 / sigmamat)
+    llik_norms <- apply(llik_mat, 1, max)
+    L_mat      <- exp(llik_mat - llik_norms)
+  })
 
   if (fix_g) {
     fitted_g <- g_init
@@ -89,9 +91,13 @@ ebnm_normal_mix_workhorse <- function(x,
       L       <- L_mat
     }
 
-    mixsqp_control_defaults <- list(verbose = FALSE)
-    control <- modifyList(mixsqp_control_defaults, control, keep.null = TRUE)
-    optres  <- mixsqp(L = L, x0 = pi_init, control = control)
+    t.opt <- system.time({
+      mixsqp_control_defaults <- list(verbose = FALSE)
+      control <- modifyList(mixsqp_control_defaults, control, keep.null = TRUE)
+      optres  <- mixsqp(L = L, x0 = pi_init, control = control)
+    })
+
+    message("mixsqp ratio: ", t.opt[3] / t.llik[3])
 
     pi_est <- rep(0, n_mixcomp)
     pi_est[nonzero_cols] <- pmax(optres$x, 0)
